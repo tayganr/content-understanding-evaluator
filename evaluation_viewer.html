@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Analyzer Evaluation Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .metric-card {
+            transition: transform 0.2s;
+            height: 120px;
+        }
+        .metric-card .card-body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        .accuracy-bar {
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: #e9ecef !important;
+            border: 1px solid #dee2e6;
+        }
+        .accuracy-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        .field-performance-grid {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .comparison-highlight {
+            background-color: #fff3cd !important;
+        }
+        .improvement {
+            color: #28a745;
+        }
+        .regression {
+            color: #dc3545;
+        }
+        .file-drop-zone {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .file-drop-zone:hover {
+            border-color: #0d6efd;
+            background-color: #f8f9fa;
+        }
+        .file-drop-zone.dragover {
+            border-color: #0d6efd;
+            background-color: #e3f2fd;
+        }
+        .run-badge {
+            font-size: 0.8em;
+            padding: 0.25rem 0.5rem;
+        }
+        .cost-breakdown {
+            font-size: 0.9em;
+        }
+        .field-detail-row {
+            font-size: 0.9em;
+        }
+        .status-icon {
+            font-size: 1.2em;
+        }
+        .complex-field-toggle {
+            cursor: pointer;
+            user-select: none;
+            color: #0d6efd;
+        }
+        .complex-field-toggle:hover {
+            text-decoration: underline;
+        }
+        .complex-field-content {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 5px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+        .complex-diff {
+            background-color: #fff3cd;
+            border-left: 3px solid #ffc107;
+            padding: 5px;
+            margin: 2px 0;
+        }
+        .complex-match {
+            background-color: #d1edff;
+            border-left: 3px solid #0d6efd;
+            padding: 5px;
+            margin: 2px 0;
+        }
+        .json-key {
+            color: #0066cc;
+            font-weight: bold;
+        }
+        .json-string {
+            color: #008000;
+        }
+        .json-number {
+            color: #ff6600;
+        }
+        .json-boolean {
+            color: #cc0066;
+        }
+        .json-null {
+            color: #666666;
+            font-style: italic;
+        }
+        .change-positive {
+            color: #28a745 !important;
+            font-weight: bold;
+        }
+        .change-negative {
+            color: #dc3545 !important;
+            font-weight: bold;
+        }
+        .change-neutral {
+            color: #6c757d !important;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">📊 Document Analyzer Evaluation Viewer</span>
+            <div class="d-flex">
+                <button class="btn btn-outline-light" onclick="clearAllData()">Clear All</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Auto-Load Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">📁 Evaluation Reports</h5>
+                        <div>
+                            <button class="btn btn-primary btn-sm" onclick="loadAllReports()">
+                                <span class="spinner-border spinner-border-sm me-2" id="loadingSpinner" style="display: none;"></span>
+                                🔄 Scan & Load Reports
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <strong>Auto-Discovery:</strong> This viewer automatically scans for evaluation reports in sequential folders (<code>output/run_001/</code>, <code>output/run_002/</code>, etc.).
+                            Click "Scan & Load Reports" to find and load all available evaluation runs.
+                        </div>
+                        <div id="loadedFiles"></div>
+                        <div id="scanResults" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Dashboard -->
+        <div class="row mb-4" id="summarySection" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">📈 Evaluation Summary</h5>
+                        <div>
+                            <select class="form-select form-select-sm" id="summaryTimeRange" onchange="updateSummary()">
+                                <option value="all">All Runs</option>
+                                <option value="recent">Last 10 Runs</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="summaryCards">
+                            <!-- Summary cards will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Tabs -->
+        <div class="row" id="mainContent" style="display: none;">
+            <div class="col-12">
+                <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="runs-tab" data-bs-toggle="tab" data-bs-target="#runs" type="button" role="tab">
+                            📋 Evaluation Runs
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="compare-tab" data-bs-toggle="tab" data-bs-target="#compare" type="button" role="tab">
+                            🔍 Compare Runs
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="fields-tab" data-bs-toggle="tab" data-bs-target="#fields" type="button" role="tab">
+                            🎯 Field Performance
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="costs-tab" data-bs-toggle="tab" data-bs-target="#costs" type="button" role="tab">
+                            💰 Cost Analysis
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="mainTabContent">
+                    <!-- Evaluation Runs Tab -->
+                    <div class="tab-pane fade show active" id="runs" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">Evaluation Runs</h6>
+                                <div class="d-flex gap-2">
+                                    <input type="text" class="form-control form-control-sm" id="runsSearch" placeholder="Search runs..." style="width: 200px;">
+                                    <select class="form-select form-select-sm" id="runsSort" onchange="sortRuns()" style="width: 150px;">
+                                        <option value="date_desc">Newest First</option>
+                                        <option value="date_asc">Oldest First</option>
+                                        <option value="accuracy_desc">Best Accuracy</option>
+                                        <option value="accuracy_asc">Worst Accuracy</option>
+                                        <option value="cost_desc">Highest Cost</option>
+                                        <option value="cost_asc">Lowest Cost</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0" id="runsTable">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Run ID</th>
+                                                <th>Date</th>
+                                                <th>Mode</th>
+                                                <th>Documents</th>
+                                                <th>Accuracy</th>
+                                                <th>Cost</th>
+                                                <th>Schema</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="runsTableBody">
+                                            <!-- Runs data will be populated here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Compare Runs Tab -->
+                    <div class="tab-pane fade" id="compare" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Compare Evaluation Runs</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Baseline Run</label>
+                                        <select class="form-select" id="compareBaselineSelect">
+                                            <option value="">Select baseline run...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Comparison Run</label>
+                                        <select class="form-select" id="compareTargetSelect">
+                                            <option value="">Select comparison run...</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" onclick="compareRuns()">Compare Selected Runs</button>
+                                <div id="comparisonResults" class="mt-4"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Field Performance Tab -->
+                    <div class="tab-pane fade" id="fields" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">Field Performance Analysis</h6>
+                                <select class="form-select form-select-sm" id="fieldAnalysisRun" onchange="updateFieldAnalysis()" style="width: 300px;">
+                                    <option value="all">All Runs (Aggregate)</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <div id="fieldPerformanceContent">
+                                    <!-- Field performance analysis will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cost Analysis Tab -->
+                    <div class="tab-pane fade" id="costs" role="tabpanel">
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Cost Analysis</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="costAnalysisContent">
+                                    <!-- Cost analysis will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Run Detail Modal -->
+        <div class="modal fade" id="runDetailModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="runDetailModalTitle">Run Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="runDetailModalBody">
+                        <!-- Run details will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global state
+        let evaluationRuns = [];
+        let filteredRuns = [];
+
+        // Utility functions for complex data handling
+        function isComplexData(value) {
+            if (typeof value === 'string') {
+                try {
+                    const parsed = JSON.parse(value);
+                    return typeof parsed === 'object' && parsed !== null;
+                } catch {
+                    return false;
+                }
+            }
+            return typeof value === 'object' && value !== null;
+        }
+
+        function parseComplexData(value) {
+            if (typeof value === 'string') {
+                try {
+                    return JSON.parse(value);
+                } catch {
+                    return value;
+                }
+            }
+            return value;
+        }
+
+        function formatJsonValue(value, indent = 0) {
+            const spaces = '  '.repeat(indent);
+            
+            if (value === null) {
+                return `<span class="json-null">null</span>`;
+            } else if (typeof value === 'boolean') {
+                return `<span class="json-boolean">${value}</span>`;
+            } else if (typeof value === 'number') {
+                return `<span class="json-number">${value}</span>`;
+            } else if (typeof value === 'string') {
+                return `<span class="json-string">"${value}"</span>`;
+            } else if (Array.isArray(value)) {
+                if (value.length === 0) return '[]';
+                const items = value.map((item, index) => 
+                    `${spaces}  <span class="json-key">[${index}]</span>: ${formatJsonValue(item, indent + 1)}`
+                ).join(',\n');
+                return `[\n${items}\n${spaces}]`;
+            } else if (typeof value === 'object') {
+                const keys = Object.keys(value);
+                if (keys.length === 0) return '{}';
+                const items = keys.map(key => 
+                    `${spaces}  <span class="json-key">"${key}"</span>: ${formatJsonValue(value[key], indent + 1)}`
+                ).join(',\n');
+                return `{\n${items}\n${spaces}}`;
+            }
+            return String(value);
+        }
+
+        function compareComplexData(expected, actual) {
+            const expectedParsed = parseComplexData(expected);
+            const actualParsed = parseComplexData(actual);
+            
+            function deepCompare(exp, act, path = '') {
+                const differences = [];
+                
+                if (typeof exp !== typeof act) {
+                    differences.push({
+                        path: path || 'root',
+                        expected: exp,
+                        actual: act,
+                        type: 'type_mismatch'
+                    });
+                    return differences;
+                }
+                
+                if (Array.isArray(exp) && Array.isArray(act)) {
+                    const maxLength = Math.max(exp.length, act.length);
+                    for (let i = 0; i < maxLength; i++) {
+                        const newPath = `${path}[${i}]`;
+                        if (i >= exp.length) {
+                            differences.push({
+                                path: newPath,
+                                expected: undefined,
+                                actual: act[i],
+                                type: 'extra_actual'
+                            });
+                        } else if (i >= act.length) {
+                            differences.push({
+                                path: newPath,
+                                expected: exp[i],
+                                actual: undefined,
+                                type: 'missing_actual'
+                            });
+                        } else {
+                            differences.push(...deepCompare(exp[i], act[i], newPath));
+                        }
+                    }
+                } else if (typeof exp === 'object' && exp !== null && typeof act === 'object' && act !== null) {
+                    const allKeys = new Set([...Object.keys(exp), ...Object.keys(act)]);
+                    for (const key of allKeys) {
+                        const newPath = path ? `${path}.${key}` : key;
+                        if (!(key in exp)) {
+                            differences.push({
+                                path: newPath,
+                                expected: undefined,
+                                actual: act[key],
+                                type: 'extra_actual'
+                            });
+                        } else if (!(key in act)) {
+                            differences.push({
+                                path: newPath,
+                                expected: exp[key],
+                                actual: undefined,
+                                type: 'missing_actual'
+                            });
+                        } else {
+                            differences.push(...deepCompare(exp[key], act[key], newPath));
+                        }
+                    }
+                } else if (exp !== act) {
+                    differences.push({
+                        path: path || 'root',
+                        expected: exp,
+                        actual: act,
+                        type: 'value_mismatch'
+                    });
+                }
+                
+                return differences;
+            }
+            
+            return deepCompare(expectedParsed, actualParsed);
+        }
+
+        function generateComplexFieldComparison(expected, actual, fieldName) {
+            const differences = compareComplexData(expected, actual);
+            const expectedParsed = parseComplexData(expected);
+            const actualParsed = parseComplexData(actual);
+            
+            let html = `<div class="complex-field-content">`;
+            
+            if (differences.length === 0) {
+                html += `
+                    <div class="complex-match">
+                        <strong>✅ Values match exactly</strong>
+                    </div>
+                    <div class="mt-2">
+                        <strong>Value:</strong><br>
+                        ${generateSmartComparison(expectedParsed, actualParsed, true)}
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="complex-diff">
+                        <strong>❌ Found ${differences.length} difference(s)</strong>
+                    </div>
+                    <div class="mt-2">
+                        ${generateSmartComparison(expectedParsed, actualParsed, false)}
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            return html;
+        }
+
+        function generateSmartComparison(expected, actual, isMatch) {
+            // Check if both are arrays of objects (most common case)
+            if (Array.isArray(expected) && Array.isArray(actual) && 
+                expected.length > 0 && actual.length > 0 &&
+                typeof expected[0] === 'object' && typeof actual[0] === 'object') {
+                return generateArrayOfObjectsComparison(expected, actual, isMatch);
+            }
+            
+            // Check if both are single objects
+            if (typeof expected === 'object' && typeof actual === 'object' && 
+                !Array.isArray(expected) && !Array.isArray(actual)) {
+                return generateObjectComparison(expected, actual, isMatch);
+            }
+            
+            // Fallback to side-by-side JSON view for other cases
+            return generateSideBySideComparison(expected, actual, isMatch);
+        }
+
+        function generateArrayOfObjectsComparison(expected, actual, isMatch) {
+            // Get all unique keys from all objects
+            const allKeys = new Set();
+            [...expected, ...actual].forEach(obj => {
+                if (obj && typeof obj === 'object') {
+                    Object.keys(obj).forEach(key => allKeys.add(key));
+                }
+            });
+            
+            const maxLength = Math.max(expected.length, actual.length);
+            
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 50px;">#</th>
+                                ${Array.from(allKeys).map(key => `<th>${key}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            for (let i = 0; i < maxLength; i++) {
+                const expectedItem = expected[i];
+                const actualItem = actual[i];
+                
+                let rowClass = '';
+                if (!expectedItem && actualItem) {
+                    rowClass = 'table-warning'; // Extra in actual
+                } else if (expectedItem && !actualItem) {
+                    rowClass = 'table-danger'; // Missing in actual
+                } else if (expectedItem && actualItem) {
+                    // Check if any field differs
+                    const differs = Array.from(allKeys).some(key => 
+                        JSON.stringify(expectedItem[key]) !== JSON.stringify(actualItem[key])
+                    );
+                    if (differs && !isMatch) {
+                        rowClass = 'table-warning';
+                    }
+                }
+                
+                html += `<tr class="${rowClass}">`;
+                html += `<td><strong>${i + 1}</strong></td>`;
+                
+                Array.from(allKeys).forEach(key => {
+                    const expectedVal = expectedItem ? expectedItem[key] : undefined;
+                    const actualVal = actualItem ? actualItem[key] : undefined;
+                    
+                    let cellClass = '';
+                    let cellContent = '';
+                    
+                    if (!isMatch && expectedVal !== undefined && actualVal !== undefined && 
+                        JSON.stringify(expectedVal) !== JSON.stringify(actualVal)) {
+                        cellClass = 'bg-light border-warning';
+                        cellContent = `
+                            <div class="small">
+                                <div class="text-muted">Expected:</div>
+                                <div class="fw-bold">${formatPrimitiveValue(expectedVal)}</div>
+                                <div class="text-muted mt-1">Actual:</div>
+                                <div class="fw-bold text-danger">${formatPrimitiveValue(actualVal)}</div>
+                            </div>
+                        `;
+                    } else if (actualVal !== undefined) {
+                        cellContent = formatPrimitiveValue(actualVal);
+                    } else if (expectedVal !== undefined) {
+                        cellClass = 'bg-light text-muted';
+                        cellContent = `<em>Missing: ${formatPrimitiveValue(expectedVal)}</em>`;
+                    } else {
+                        cellContent = '<span class="text-muted">—</span>';
+                    }
+                    
+                    html += `<td class="${cellClass}">${cellContent}</td>`;
+                });
+                
+                html += `</tr>`;
+            }
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            if (!isMatch) {
+                html += `
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <strong>Legend:</strong>
+                            <span class="badge bg-warning text-dark ms-2">Row/Cell differences</span>
+                            <span class="badge bg-light text-dark ms-1">Missing values</span>
+                        </small>
+                    </div>
+                `;
+            }
+            
+            return html;
+        }
+
+        function generateObjectComparison(expected, actual, isMatch) {
+            const allKeys = new Set([...Object.keys(expected), ...Object.keys(actual)]);
+            
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Property</th>
+                                <th>Expected</th>
+                                <th>Actual</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            Array.from(allKeys).forEach(key => {
+                const expectedVal = expected[key];
+                const actualVal = actual[key];
+                
+                let status = '✅';
+                let rowClass = '';
+                
+                if (expectedVal === undefined) {
+                    status = '➕ Extra';
+                    rowClass = 'table-info';
+                } else if (actualVal === undefined) {
+                    status = '❌ Missing';
+                    rowClass = 'table-danger';
+                } else if (JSON.stringify(expectedVal) !== JSON.stringify(actualVal)) {
+                    status = '⚠️ Different';
+                    rowClass = 'table-warning';
+                }
+                
+                html += `
+                    <tr class="${rowClass}">
+                        <td><code>${key}</code></td>
+                        <td>${expectedVal !== undefined ? formatPrimitiveValue(expectedVal) : '<span class="text-muted">—</span>'}</td>
+                        <td>${actualVal !== undefined ? formatPrimitiveValue(actualVal) : '<span class="text-muted">—</span>'}</td>
+                        <td>${status}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            return html;
+        }
+
+        function generateSideBySideComparison(expected, actual, isMatch) {
+            return `
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Expected:</strong><br>
+                        <pre style="margin: 0; white-space: pre-wrap; background: #f8f9fa; padding: 8px; border-radius: 4px; font-size: 0.85em;">${formatJsonValue(expected)}</pre>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Actual:</strong><br>
+                        <pre style="margin: 0; white-space: pre-wrap; background: #f8f9fa; padding: 8px; border-radius: 4px; font-size: 0.85em;">${formatJsonValue(actual)}</pre>
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatPrimitiveValue(value) {
+            if (value === null) return '<span class="text-muted fst-italic">null</span>';
+            if (value === undefined) return '<span class="text-muted fst-italic">undefined</span>';
+            if (typeof value === 'string') return `<span class="text-success">"${value}"</span>`;
+            if (typeof value === 'number') return `<span class="text-primary">${value}</span>`;
+            if (typeof value === 'boolean') return `<span class="text-info">${value}</span>`;
+            if (typeof value === 'object') return `<span class="text-secondary">${JSON.stringify(value)}</span>`;
+            return String(value);
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-load reports on page load
+            loadAllReports();
+        });
+
+        // Auto-loading functionality
+        async function loadAllReports() {
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const scanResults = document.getElementById('scanResults');
+            
+            loadingSpinner.style.display = 'inline-block';
+            scanResults.innerHTML = '<div class="text-muted">Scanning for evaluation reports...</div>';
+
+            try {
+                // Since we're running as a static HTML file, we need to make HTTP requests
+                // to fetch the JSON files. This assumes the HTML file is in the same directory
+                // as the output folder, and we're serving it via a local web server.
+                
+                const outputPaths = await discoverReportFiles();
+                
+                if (outputPaths.length === 0) {
+                    scanResults.innerHTML = `
+                        <div class="alert alert-warning">
+                            <strong>No evaluation reports found.</strong><br>
+                            Make sure you have run the document analyzer evaluator and generated some reports in the <code>output/</code> directory.
+                            <br><br>
+                            <strong>Note:</strong> If you're opening this HTML file directly in your browser (file:// protocol), 
+                            you'll need to serve it via a local web server to access the JSON files. Try:
+                            <ul class="mb-0 mt-2">
+                                <li><code>python -m http.server 8000</code> (Python)</li>
+                                <li><code>npx serve .</code> (Node.js)</li>
+                                <li>Or use VS Code's Live Server extension</li>
+                            </ul>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let loadedCount = 0;
+                let errorCount = 0;
+                const errors = [];
+
+                // Show progress while loading
+                scanResults.innerHTML = `<div class="text-muted">Found ${outputPaths.length} potential report(s), loading...</div>`;
+
+                for (const path of outputPaths) {
+                    try {
+                        const response = await fetch(path);
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        const data = await response.json();
+                        
+                        if (data.metadata && data.metadata.run_id) {
+                            addEvaluationRun(data, path);
+                            loadedCount++;
+                        } else {
+                            errorCount++;
+                            errors.push(`${path}: Invalid evaluation report format`);
+                        }
+                    } catch (error) {
+                        errorCount++;
+                        // Only log actual errors, not 404s which are expected in fallback mode
+                        if (!error.message.includes('404')) {
+                            errors.push(`${path}: ${error.message}`);
+                        }
+                    }
+                }
+
+                // Update results
+                let resultHtml = `<div class="alert alert-success">
+                    <strong>Scan completed!</strong> Loaded ${loadedCount} evaluation report(s).`;
+                
+                if (errorCount > 0 && loadedCount === 0) {
+                    resultHtml = `<div class="alert alert-warning">
+                        <strong>No valid reports found.</strong> Checked ${outputPaths.length} location(s) but found no valid evaluation reports.`;
+                } else if (errorCount > 0) {
+                    resultHtml += `<br><small class="text-muted">Skipped ${errorCount} invalid or inaccessible file(s).</small>`;
+                }
+                
+                resultHtml += '</div>';
+
+                // Only show errors if they're significant and we have few loaded files
+                if (errors.length > 0 && errors.length <= 3 && loadedCount < 3) {
+                    resultHtml += `<div class="alert alert-info">
+                        <strong>Note:</strong> Some locations were checked but didn't contain valid reports:
+                        <ul class="mb-0 mt-1">
+                            ${errors.slice(0, 3).map(error => `<li><small>${error}</small></li>`).join('')}
+                        </ul>
+                    </div>`;
+                }
+
+                scanResults.innerHTML = resultHtml;
+
+            } catch (error) {
+                scanResults.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Error scanning for reports:</strong> ${error.message}
+                        <br><br>
+                        <strong>Troubleshooting:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Make sure you're serving this HTML file via a web server, not opening it directly</li>
+                            <li>Ensure the <code>output/</code> directory exists and contains evaluation reports</li>
+                            <li>Check browser console for additional error details</li>
+                        </ul>
+                    </div>
+                `;
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        async function discoverReportFiles() {
+            // Simple sequential discovery - try run_001, run_002, etc. until we hit a missing one
+            const reportPaths = [];
+            let runNumber = 1;
+            
+            console.log('Starting sequential discovery of evaluation reports...');
+            
+            while (true) {
+                const runId = runNumber.toString().padStart(3, '0');
+                const path = `./output/run_${runId}/evaluation_report.json`;
+                
+                try {
+                    const response = await fetch(path, { method: 'HEAD' });
+                    if (response.ok) {
+                        reportPaths.push(path);
+                        console.log(`Found: ${path}`);
+                        runNumber++;
+                    } else {
+                        // Hit a missing run, stop scanning
+                        console.log(`Stopped at missing run: ${path}`);
+                        break;
+                    }
+                } catch (error) {
+                    // Hit a missing run, stop scanning
+                    console.log(`Stopped at missing run: ${path} (${error.message})`);
+                    break;
+                }
+                
+                // Safety limit to prevent infinite loops
+                if (runNumber > 1000) {
+                    console.warn('Reached safety limit of 1000 runs');
+                    break;
+                }
+            }
+            
+            console.log(`Sequential discovery found ${reportPaths.length} evaluation reports`);
+            return reportPaths;
+        }
+
+        function addEvaluationRun(data, sourcePath) {
+            // Check if run already exists
+            const existingIndex = evaluationRuns.findIndex(run => run.metadata.run_id === data.metadata.run_id);
+            
+            if (existingIndex >= 0) {
+                evaluationRuns[existingIndex] = data;
+            } else {
+                evaluationRuns.push(data);
+            }
+
+            updateLoadedFilesList();
+            updateAllViews();
+        }
+
+        function updateLoadedFilesList() {
+            const container = document.getElementById('loadedFiles');
+            if (evaluationRuns.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const html = `
+                <div class="mt-3">
+                    <h6>Loaded Evaluation Runs (${evaluationRuns.length})</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        ${evaluationRuns.map(run => `
+                            <span class="badge bg-success run-badge">
+                                ${run.metadata.run_id}
+                                <button type="button" class="btn-close btn-close-white ms-1" 
+                                        onclick="removeRun('${run.metadata.run_id}')" 
+                                        style="font-size: 0.7em;"></button>
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+        }
+
+        function removeRun(runId) {
+            evaluationRuns = evaluationRuns.filter(run => run.metadata.run_id !== runId);
+            updateLoadedFilesList();
+            updateAllViews();
+        }
+
+        function updateAllViews() {
+            if (evaluationRuns.length === 0) {
+                document.getElementById('summarySection').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('summarySection').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'block';
+
+            setupSearch(); // Initialize search functionality
+            updateSummary();
+            updateRunsTable();
+            updateCompareSelects();
+            updateFieldAnalysisSelect();
+            updateFieldAnalysis();
+            updateCostAnalysis();
+        }
+
+        function setupSearch() {
+            const searchInput = document.getElementById('runsSearch');
+            // Remove existing event listeners to avoid duplicates
+            searchInput.replaceWith(searchInput.cloneNode(true));
+            const newSearchInput = document.getElementById('runsSearch');
+            
+            newSearchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                filteredRuns = evaluationRuns.filter(run => 
+                    run.metadata.run_id.toLowerCase().includes(searchTerm) ||
+                    run.metadata.mode.toLowerCase().includes(searchTerm) ||
+                    run.metadata.schema_file.toLowerCase().includes(searchTerm)
+                );
+                updateRunsTableBody();
+            });
+        }
+
+        function updateSummary() {
+            const timeRange = document.getElementById('summaryTimeRange').value;
+            let runsToAnalyze = evaluationRuns;
+
+            // Filter by time range
+            if (timeRange !== 'all') {
+                const now = new Date();
+                runsToAnalyze = evaluationRuns.filter(run => {
+                    const runDate = new Date(run.metadata.date);
+                    switch (timeRange) {
+                        case 'today':
+                            return runDate.toDateString() === now.toDateString();
+                        case 'week':
+                            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                            return runDate >= weekAgo;
+                        case 'recent':
+                            return evaluationRuns.slice(-10).includes(run);
+                        default:
+                            return true;
+                    }
+                });
+            }
+
+            const totalRuns = runsToAnalyze.length;
+            const avgAccuracy = totalRuns > 0 ? 
+                runsToAnalyze.reduce((sum, run) => sum + run.summary.overall_accuracy, 0) / totalRuns : 0;
+            const totalCost = runsToAnalyze.reduce((sum, run) => sum + run.costs.aggregate.total, 0);
+            const totalDocs = runsToAnalyze.reduce((sum, run) => sum + run.summary.documents_analyzed, 0);
+
+            const recentRuns = runsToAnalyze.slice(-5);
+            const trend = recentRuns.length > 1 ? 
+                (recentRuns[recentRuns.length - 1].summary.overall_accuracy - recentRuns[0].summary.overall_accuracy) : 0;
+
+            const summaryHtml = `
+                <div class="col-md-3">
+                    <div class="card metric-card text-center border-primary">
+                        <div class="card-body">
+                            <h2 class="text-primary">${totalRuns}</h2>
+                            <p class="card-text">Total Runs</p>
+                            <div style="height: 20px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card text-center border-success">
+                        <div class="card-body">
+                            <h2 class="text-success">${avgAccuracy.toFixed(0)}%</h2>
+                            <p class="card-text">Average Accuracy</p>
+                            <div style="height: 20px;">
+                                ${trend !== 0 ? `<small class="${trend > 0 ? 'improvement' : 'regression'}">${trend > 0 ? '↗' : '↘'} ${Math.abs(trend).toFixed(0)}%</small>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card text-center border-warning">
+                        <div class="card-body">
+                            <h2 class="text-warning">$${totalCost.toFixed(2)}</h2>
+                            <p class="card-text">Total Cost</p>
+                            <div style="height: 20px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card text-center border-info">
+                        <div class="card-body">
+                            <h2 class="text-info">${totalDocs}</h2>
+                            <p class="card-text">Documents Processed</p>
+                            <div style="height: 20px;"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('summaryCards').innerHTML = summaryHtml;
+        }
+
+        function sortRuns() {
+            const sortBy = document.getElementById('runsSort').value;
+            const runsToSort = filteredRuns.length > 0 ? filteredRuns : evaluationRuns;
+
+            runsToSort.sort((a, b) => {
+                switch (sortBy) {
+                    case 'date_desc':
+                        return new Date(b.metadata.date) - new Date(a.metadata.date);
+                    case 'date_asc':
+                        return new Date(a.metadata.date) - new Date(b.metadata.date);
+                    case 'accuracy_desc':
+                        return b.summary.overall_accuracy - a.summary.overall_accuracy;
+                    case 'accuracy_asc':
+                        return a.summary.overall_accuracy - b.summary.overall_accuracy;
+                    case 'cost_desc':
+                        return b.costs.aggregate.total - a.costs.aggregate.total;
+                    case 'cost_asc':
+                        return a.costs.aggregate.total - b.costs.aggregate.total;
+                    default:
+                        return 0;
+                }
+            });
+
+            updateRunsTableBody();
+        }
+
+        function updateRunsTable() {
+            filteredRuns = evaluationRuns;
+            sortRuns();
+        }
+
+        function updateRunsTableBody() {
+            const tbody = document.getElementById('runsTableBody');
+            const runsToShow = filteredRuns.length > 0 ? filteredRuns : evaluationRuns;
+
+            if (runsToShow.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No evaluation runs loaded</td></tr>';
+                return;
+            }
+
+            const html = runsToShow.map(run => {
+                const accuracy = run.summary.overall_accuracy;
+                const accuracyClass = accuracy >= 90 ? 'success' : accuracy >= 70 ? 'warning' : 'danger';
+                
+                return `
+                    <tr>
+                        <td>
+                            <code>${run.metadata.run_id}</code>
+                        </td>
+                        <td>${new Date(run.metadata.date).toLocaleString()}</td>
+                        <td>
+                            <span class="badge bg-${run.metadata.mode === 'pro' ? 'primary' : 'secondary'}">
+                                ${run.metadata.mode.toUpperCase()}
+                            </span>
+                        </td>
+                        <td>${run.summary.documents_analyzed}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="accuracy-bar me-2" style="width: 60px;">
+                                    <div class="accuracy-fill bg-${accuracyClass}" style="width: ${accuracy}%;"></div>
+                                </div>
+                                <span class="text-${accuracyClass} fw-bold">${accuracy.toFixed(0)}%</span>
+                            </div>
+                        </td>
+                        <td class="text-end">$${run.costs.aggregate.total.toFixed(2)}</td>
+                        <td>
+                            <small class="text-muted">${run.metadata.schema_file}</small>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="showRunDetails('${run.metadata.run_id}')">
+                                View Details
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.innerHTML = html;
+        }
+
+        function showRunDetails(runId) {
+            const run = evaluationRuns.find(r => r.metadata.run_id === runId);
+            if (!run) return;
+
+            document.getElementById('runDetailModalTitle').textContent = `${run.metadata.run_id} - Details`;
+            
+            let detailsHtml = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Run Information</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Run ID:</strong></td><td><code>${run.metadata.run_id}</code></td></tr>
+                            <tr><td><strong>Date:</strong></td><td>${new Date(run.metadata.date).toLocaleString()}</td></tr>
+                            <tr><td><strong>Mode:</strong></td><td><span class="badge bg-${run.metadata.mode === 'pro' ? 'primary' : 'secondary'}">${run.metadata.mode.toUpperCase()}</span></td></tr>
+                            <tr><td><strong>Schema:</strong></td><td>${run.metadata.schema_file}</td></tr>
+                            <tr><td><strong>Analyzer ID:</strong></td><td>${run.metadata.analyzer_id}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Performance Summary</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Documents:</strong></td><td>${run.summary.documents_analyzed}</td></tr>
+                            <tr><td><strong>Fields Tested:</strong></td><td>${run.summary.total_fields_tested}</td></tr>
+                            <tr><td><strong>Overall Accuracy:</strong></td><td><span class="fw-bold text-${run.summary.overall_accuracy >= 90 ? 'success' : run.summary.overall_accuracy >= 70 ? 'warning' : 'danger'}">${run.summary.overall_accuracy.toFixed(0)}%</span></td></tr>
+                            <tr><td><strong>Passes:</strong></td><td class="text-success">${run.summary.field_passes}</td></tr>
+                            <tr><td><strong>Failures:</strong></td><td class="text-danger">${run.summary.field_failures}</td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <h6>Cost Breakdown</h6>
+                        <table class="table table-sm cost-breakdown">
+                            <tr><td>Content Extraction:</td><td class="text-end">$${run.costs.aggregate.content_extraction.toFixed(2)}</td></tr>
+                            <tr><td>Field Extraction:</td><td class="text-end">$${run.costs.aggregate.field_extraction.toFixed(2)}</td></tr>
+                            <tr><td>Contextualization:</td><td class="text-end">$${run.costs.aggregate.contextualization.toFixed(2)}</td></tr>
+                            <tr class="table-dark"><td><strong>Total:</strong></td><td class="text-end"><strong>$${run.costs.aggregate.total.toFixed(2)}</strong></td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Per-Document Costs</h6>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            <table class="table table-sm">
+                                ${run.costs.per_document.map(doc => `
+                                    <tr>
+                                        <td>${doc.document}</td>
+                                        <td class="text-end">$${doc.costs.total.toFixed(2)}</td>
+                                        <td class="text-muted">${doc.usage.documentPages} pages</td>
+                                    </tr>
+                                `).join('')}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add field-level results if available
+            if (run.results.document_level && run.results.document_level.length > 0) {
+                detailsHtml += `
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Field-Level Results</h6>
+                            ${run.results.document_level.map(doc => `
+                                <div class="mb-3">
+                                    <h6 class="text-secondary">${doc.doc}</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm field-detail-row">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Field</th>
+                                                    <th>Expected</th>
+                                                    <th>Actual</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${Object.entries(doc.fields).map(([field, details]) => {
+                                                    const isComplex = isComplexData(details.expected) || isComplexData(details.actual);
+                                                    const fieldId = `field_${doc.doc.replace(/[^a-zA-Z0-9]/g, '_')}_${field.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                                                    
+                                                    let expectedDisplay = details.expected || 'N/A';
+                                                    let actualDisplay = details.actual || 'N/A';
+                                                    
+                                                    if (isComplex) {
+                                                        expectedDisplay = `<span class="complex-field-toggle" onclick="toggleComplexField('${fieldId}')">
+                                                            📋 Complex Data (click to expand)
+                                                        </span>`;
+                                                        actualDisplay = `<span class="complex-field-toggle" onclick="toggleComplexField('${fieldId}')">
+                                                            📋 Complex Data (click to expand)
+                                                        </span>`;
+                                                    }
+                                                    
+                                                    return `
+                                                        <tr class="${details.status === '✅' ? 'table-success' : 'table-danger'}">
+                                                            <td><code>${field}</code></td>
+                                                            <td>${expectedDisplay}</td>
+                                                            <td>${actualDisplay}</td>
+                                                            <td class="status-icon">${details.status}</td>
+                                                        </tr>
+                                                        ${isComplex ? `
+                                                            <tr id="${fieldId}" style="display: none;">
+                                                                <td colspan="4">
+                                                                    ${generateComplexFieldComparison(details.expected, details.actual, field)}
+                                                                </td>
+                                                            </tr>
+                                                        ` : ''}
+                                                    `;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('runDetailModalBody').innerHTML = detailsHtml;
+            const modal = new bootstrap.Modal(document.getElementById('runDetailModal'));
+            modal.show();
+        }
+
+        function updateCompareSelects() {
+            const baselineSelect = document.getElementById('compareBaselineSelect');
+            const targetSelect = document.getElementById('compareTargetSelect');
+            
+            const options = evaluationRuns.map(run => 
+                `<option value="${run.metadata.run_id}">${run.metadata.run_id} (${run.summary.overall_accuracy.toFixed(0)}%)</option>`
+            ).join('');
+            
+            baselineSelect.innerHTML = '<option value="">Select baseline run...</option>' + options;
+            targetSelect.innerHTML = '<option value="">Select comparison run...</option>' + options;
+        }
+
+        function compareRuns() {
+            const baselineId = document.getElementById('compareBaselineSelect').value;
+            const targetId = document.getElementById('compareTargetSelect').value;
+            
+            if (!baselineId || !targetId) {
+                alert('Please select both runs to compare.');
+                return;
+            }
+            
+            if (baselineId === targetId) {
+                alert('Please select different runs to compare.');
+                return;
+            }
+
+            const baseline = evaluationRuns.find(r => r.metadata.run_id === baselineId);
+            const target = evaluationRuns.find(r => r.metadata.run_id === targetId);
+
+            const comparisonHtml = generateComparisonView(baseline, target);
+            document.getElementById('comparisonResults').innerHTML = comparisonHtml;
+        }
+
+        function generateComparisonView(baseline, target) {
+            const accuracyDiff = target.summary.overall_accuracy - baseline.summary.overall_accuracy;
+            const costDiff = target.costs.aggregate.total - baseline.costs.aggregate.total;
+            
+            let html = `
+                <div class="card">
+                    <div class="card-header">
+                        <h6>Comparison Results: ${baseline.metadata.run_id} vs ${target.metadata.run_id}</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Overall Metrics</h6>
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Metric</th>
+                                            <th>Baseline</th>
+                                            <th>Target</th>
+                                            <th>Change</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Accuracy</td>
+                                            <td>${baseline.summary.overall_accuracy.toFixed(0)}%</td>
+                                            <td>${target.summary.overall_accuracy.toFixed(0)}%</td>
+                                            <td class="${accuracyDiff > 0 ? 'change-positive' : accuracyDiff < 0 ? 'change-negative' : 'change-neutral'}">
+                                                ${accuracyDiff >= 0 ? '+' : ''}${accuracyDiff.toFixed(0)}%
+                                                ${accuracyDiff > 0 ? ' ↗' : accuracyDiff < 0 ? ' ↘' : ''}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Total Cost</td>
+                                            <td>$${baseline.costs.aggregate.total.toFixed(2)}</td>
+                                            <td>$${target.costs.aggregate.total.toFixed(2)}</td>
+                                            <td class="${costDiff < 0 ? 'change-positive' : costDiff > 0 ? 'change-negative' : 'change-neutral'}">
+                                                ${costDiff >= 0 ? '+' : ''}$${costDiff.toFixed(2)}
+                                                ${costDiff < 0 ? ' ↗' : costDiff > 0 ? ' ↘' : ''}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Documents</td>
+                                            <td>${baseline.summary.documents_analyzed}</td>
+                                            <td>${target.summary.documents_analyzed}</td>
+                                            <td class="${target.summary.documents_analyzed - baseline.summary.documents_analyzed === 0 ? 'change-neutral' : 'change-neutral'}">${target.summary.documents_analyzed - baseline.summary.documents_analyzed}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Configuration Differences</h6>
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td><strong>Mode:</strong></td>
+                                        <td>${baseline.metadata.mode === target.metadata.mode ? 'Same' : `${baseline.metadata.mode} → ${target.metadata.mode}`}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Schema:</strong></td>
+                                        <td>${baseline.metadata.schema_file === target.metadata.schema_file ? 'Same' : `${baseline.metadata.schema_file} → ${target.metadata.schema_file}`}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Date Difference:</strong></td>
+                                        <td>${Math.round((new Date(target.metadata.date) - new Date(baseline.metadata.date)) / (1000 * 60 * 60 * 24))} days</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                `;
+
+            // Add field-level comparison if both runs have field data
+            if (baseline.results.field_performance && target.results.field_performance) {
+                const allFields = new Set([
+                    ...Object.keys(baseline.results.field_performance),
+                    ...Object.keys(target.results.field_performance)
+                ]);
+
+                html += `
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6>Field-Level Performance Comparison</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Field</th>
+                                            <th>Baseline Accuracy</th>
+                                            <th>Target Accuracy</th>
+                                            <th>Change</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${Array.from(allFields).map(field => {
+                                            const baselineField = baseline.results.field_performance[field];
+                                            const targetField = target.results.field_performance[field];
+                                            
+                                            const baselineAcc = baselineField ? 
+                                                (baselineField.passes / (baselineField.passes + baselineField.fails) * 100) : 0;
+                                            const targetAcc = targetField ? 
+                                                (targetField.passes / (targetField.passes + targetField.fails) * 100) : 0;
+                                            const fieldDiff = targetAcc - baselineAcc;
+                                            
+                                            return `
+                                                <tr class="${Math.abs(fieldDiff) > 5 ? 'comparison-highlight' : ''}">
+                                                    <td><code>${field}</code></td>
+                                                    <td>${baselineField ? baselineAcc.toFixed(0) + '%' : 'N/A'}</td>
+                                                    <td>${targetField ? targetAcc.toFixed(0) + '%' : 'N/A'}</td>
+                                                    <td class="${baselineField && targetField ? 
+                                                        (fieldDiff > 0 ? 'change-positive' : fieldDiff < 0 ? 'change-negative' : 'change-neutral') : 
+                                                        'change-neutral'}">
+                                                        ${baselineField && targetField ? 
+                                                            (fieldDiff >= 0 ? '+' : '') + fieldDiff.toFixed(0) + '%' + 
+                                                            (fieldDiff > 0 ? ' ↗' : fieldDiff < 0 ? ' ↘' : '') : 
+                                                            'N/A'}
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function updateFieldAnalysisSelect() {
+            const select = document.getElementById('fieldAnalysisRun');
+            const options = evaluationRuns.map(run => 
+                `<option value="${run.metadata.run_id}">${run.metadata.run_id}</option>`
+            ).join('');
+            
+            select.innerHTML = '<option value="all">All Runs (Aggregate)</option>' + options;
+        }
+
+        function updateFieldAnalysis() {
+            const selectedRun = document.getElementById('fieldAnalysisRun').value;
+            const content = document.getElementById('fieldPerformanceContent');
+
+            let fieldData = {};
+
+            if (selectedRun === 'all') {
+                // Aggregate across all runs
+                evaluationRuns.forEach(run => {
+                    if (run.results.field_performance) {
+                        Object.entries(run.results.field_performance).forEach(([field, data]) => {
+                            if (!fieldData[field]) {
+                                fieldData[field] = { passes: 0, fails: 0, runs: 0 };
+                            }
+                            fieldData[field].passes += data.passes;
+                            fieldData[field].fails += data.fails;
+                            fieldData[field].runs++;
+                        });
+                    }
+                });
+            } else {
+                const run = evaluationRuns.find(r => r.metadata.run_id === selectedRun);
+                if (run && run.results.field_performance) {
+                    fieldData = run.results.field_performance;
+                }
+            }
+
+            if (Object.keys(fieldData).length === 0) {
+                content.innerHTML = '<p class="text-muted">No field performance data available.</p>';
+                return;
+            }
+
+            const sortedFields = Object.entries(fieldData).sort((a, b) => {
+                const aAcc = a[1].passes / (a[1].passes + a[1].fails);
+                const bAcc = b[1].passes / (b[1].passes + b[1].fails);
+                return bAcc - aAcc;
+            });
+
+            const html = `
+                <div class="row">
+                    ${sortedFields.map(([field, data]) => {
+                        const total = data.passes + data.fails;
+                        const accuracy = (data.passes / total * 100);
+                        const accuracyClass = accuracy >= 90 ? 'success' : accuracy >= 70 ? 'warning' : 'danger';
+                        
+                        return `
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card border-${accuracyClass}">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-dark"><code>${field}</code></h6>
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="text-${accuracyClass} fw-bold">${accuracy.toFixed(0)}%</span>
+                                            <small class="text-muted">${total} tests${selectedRun === 'all' && data.runs ? ` (${data.runs} runs)` : ''}</small>
+                                        </div>
+                                        <div class="accuracy-bar">
+                                            <div class="accuracy-fill bg-${accuracyClass}" style="width: ${accuracy}%;"></div>
+                                        </div>
+                                        <div class="d-flex justify-content-between mt-2">
+                                            ${data.passes > 0 ? `<small class="text-success">✅ ${data.passes}</small>` : '<small></small>'}
+                                            ${data.fails > 0 ? `<small class="text-danger">❌ ${data.fails}</small>` : '<small></small>'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        function updateCostAnalysis() {
+            const content = document.getElementById('costAnalysisContent');
+            
+            if (evaluationRuns.length === 0) {
+                content.innerHTML = '<p class="text-muted">No cost data available.</p>';
+                return;
+            }
+
+            // Calculate cost trends
+            const costByMode = { standard: [], pro: [] };
+            const costOverTime = [];
+
+            evaluationRuns.forEach(run => {
+                const cost = run.costs.aggregate.total;
+                const mode = run.metadata.mode;
+                
+                if (costByMode[mode]) {
+                    costByMode[mode].push(cost);
+                }
+                
+                costOverTime.push({
+                    date: new Date(run.metadata.date),
+                    cost: cost,
+                    runId: run.metadata.run_id,
+                    mode: mode
+                });
+            });
+
+            costOverTime.sort((a, b) => a.date - b.date);
+
+            const avgStandardCost = costByMode.standard.length > 0 ? 
+                costByMode.standard.reduce((a, b) => a + b, 0) / costByMode.standard.length : 0;
+            const avgProCost = costByMode.pro.length > 0 ? 
+                costByMode.pro.reduce((a, b) => a + b, 0) / costByMode.pro.length : 0;
+
+            // Calculate cost components breakdown
+            const totalComponents = {
+                content_extraction: 0,
+                field_extraction: 0,
+                contextualization: 0
+            };
+
+            evaluationRuns.forEach(run => {
+                totalComponents.content_extraction += run.costs.aggregate.content_extraction;
+                totalComponents.field_extraction += run.costs.aggregate.field_extraction;
+                totalComponents.contextualization += run.costs.aggregate.contextualization;
+            });
+
+            const totalCost = Object.values(totalComponents).reduce((a, b) => a + b, 0);
+
+            const html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Cost by Mode</h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5 class="text-secondary">Standard</h5>
+                                        <p class="card-text">
+                                            <strong>$${avgStandardCost.toFixed(2)}</strong><br>
+                                            <small class="text-muted">Avg per run (${costByMode.standard.length} runs)</small>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <h5 class="text-primary">Pro</h5>
+                                        <p class="card-text">
+                                            <strong>$${avgProCost.toFixed(2)}</strong><br>
+                                            <small class="text-muted">Avg per run (${costByMode.pro.length} runs)</small>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Cost Components Breakdown</h6>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Content Extraction</span>
+                                <span>$${totalComponents.content_extraction.toFixed(2)} (${(totalComponents.content_extraction/totalCost*100).toFixed(1)}%)</span>
+                            </div>
+                            <div class="progress mb-2" style="height: 10px;">
+                                <div class="progress-bar bg-info" style="width: ${totalComponents.content_extraction/totalCost*100}%"></div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <span>Field Extraction</span>
+                                <span>$${totalComponents.field_extraction.toFixed(2)} (${(totalComponents.field_extraction/totalCost*100).toFixed(1)}%)</span>
+                            </div>
+                            <div class="progress mb-2" style="height: 10px;">
+                                <div class="progress-bar bg-primary" style="width: ${totalComponents.field_extraction/totalCost*100}%"></div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <span>Contextualization</span>
+                                <span>$${totalComponents.contextualization.toFixed(2)} (${(totalComponents.contextualization/totalCost*100).toFixed(1)}%)</span>
+                            </div>
+                            <div class="progress mb-2" style="height: 10px;">
+                                <div class="progress-bar bg-warning" style="width: ${totalComponents.contextualization/totalCost*100}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <h6>Cost Timeline</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Run ID</th>
+                                        <th>Mode</th>
+                                        <th>Total Cost</th>
+                                        <th>Content</th>
+                                        <th>Field Extraction</th>
+                                        <th>Context</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${costOverTime.map(item => {
+                                        const run = evaluationRuns.find(r => r.metadata.run_id === item.runId);
+                                        return `
+                                            <tr>
+                                                <td>${item.date.toLocaleDateString()}</td>
+                                                <td><code>${item.runId}</code></td>
+                                                <td><span class="badge bg-${item.mode === 'pro' ? 'primary' : 'secondary'}">${item.mode.toUpperCase()}</span></td>
+                                                <td class="text-end fw-bold">$${item.cost.toFixed(2)}</td>
+                                                <td class="text-end">$${run.costs.aggregate.content_extraction.toFixed(2)}</td>
+                                                <td class="text-end">$${run.costs.aggregate.field_extraction.toFixed(2)}</td>
+                                                <td class="text-end">$${run.costs.aggregate.contextualization.toFixed(2)}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        function clearAllData() {
+            if (confirm('Are you sure you want to clear all loaded evaluation runs?')) {
+                evaluationRuns = [];
+                filteredRuns = [];
+                updateLoadedFilesList();
+                updateAllViews();
+                
+                // Clear scan results
+                document.getElementById('scanResults').innerHTML = '';
+            }
+        }
+
+        function toggleComplexField(fieldId) {
+            const element = document.getElementById(fieldId);
+            if (element) {
+                if (element.style.display === 'none') {
+                    element.style.display = 'table-row';
+                    // Update toggle text
+                    const toggles = element.previousElementSibling.querySelectorAll('.complex-field-toggle');
+                    toggles.forEach(toggle => {
+                        toggle.innerHTML = '📋 Complex Data (click to collapse)';
+                    });
+                } else {
+                    element.style.display = 'none';
+                    // Update toggle text
+                    const toggles = element.previousElementSibling.querySelectorAll('.complex-field-toggle');
+                    toggles.forEach(toggle => {
+                        toggle.innerHTML = '📋 Complex Data (click to expand)';
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>

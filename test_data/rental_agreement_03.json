@@ -1,0 +1,44 @@
+{  
+  "tenant_name": "Ethan James Carter",  
+  "monthly_rent": 2950,  
+  "lease_start_date": "2024-03-01",  
+  "lease_end_date": "2025-02-28",  
+  "is_furnished": true,  
+  "number_of_occupants": 2,  
+  "move_in_time": "13:30",  
+  "property_type": "House",  
+  "tenant_contacts": [  
+    {  
+      "contact_name": "Laura Carter",  
+      "relation": "Mother",  
+      "phone": "+1 (312) 333-4422"  
+    },  
+    {  
+      "contact_name": "Peter Wong",  
+      "relation": "Employer",  
+      "phone": "+1 (773) 777-1188"  
+    }  
+  ],  
+  "payment_schedule": [  
+    {  
+      "due_date": "2024-03-01",  
+      "amount_due": 2950,  
+      "paid": true  
+    },  
+    {  
+      "due_date": "2024-04-01",  
+      "amount_due": 2950,  
+      "paid": true  
+    },  
+    {  
+      "due_date": "2024-05-01",  
+      "amount_due": 2950,  
+      "paid": false  
+    },  
+    {  
+      "due_date": "2024-06-01",  
+      "amount_due": 2950,  
+      "paid": false  
+    }  
+  ]  
+}  

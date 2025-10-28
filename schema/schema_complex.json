@@ -1,0 +1,93 @@
+{  
+  "fields": {  
+    "tenant_name": {  
+      "type": "string",  
+      "method": "extract",  
+      "description": "Full legal name of the tenant not including the prefix Mr./Ms."  
+    },  
+    "monthly_rent": {  
+      "type": "number",  
+      "method": "extract",  
+      "description": "Monthly rent amount in USD"  
+    },  
+    "lease_start_date": {  
+      "type": "date",  
+      "method": "extract",  
+      "description": "Lease start date in ISO format (YYYY-MM-DD)"  
+    },  
+    "lease_end_date": {  
+      "type": "date",  
+      "method": "extract",  
+      "description": "Lease end date in ISO format (YYYY-MM-DD)"  
+    },  
+    "is_furnished": {  
+      "type": "boolean",  
+      "method": "generate",  
+      "description": "Is the apartment furnished? true/false"  
+    },  
+    "number_of_occupants": {  
+      "type": "integer",  
+      "method": "extract",  
+      "description": "Number of people allowed to occupy the unit"  
+    },  
+    "move_in_time": {  
+      "type": "time",  
+      "method": "extract",  
+      "description": "Time of day tenant can move in (HH:mm format)"  
+    },  
+    "property_type": {  
+      "type": "string",  
+      "method": "classify",  
+      "enum": ["Apartment", "House", "Condo", "Townhouse"],  
+      "description": "Type of rental property"  
+    },  
+    "tenant_contacts": {  
+      "type": "array",  
+      "items": {  
+        "type": "object",  
+        "properties": {  
+          "contact_name": {  
+            "type": "string",  
+            "method": "extract",  
+            "description": "Contact person's full name"  
+          },  
+          "relation": {  
+            "type": "string",  
+            "method": "extract",  
+            "description": "Relationship to tenant (e.g., emergency, employer, family)"  
+          },  
+          "phone": {  
+            "type": "string",  
+            "method": "extract",  
+            "description": "Phone number"  
+          }  
+        }  
+      },  
+      "description": "List of tenant contacts"  
+    },  
+    "payment_schedule": {  
+      "type": "array",  
+      "items": {  
+        "type": "object",  
+        "properties": {  
+          "due_date": {  
+            "type": "date",  
+            "method": "extract",  
+            "description": "Rent due date"  
+          },  
+          "amount_due": {  
+            "type": "number",  
+            "method": "extract",  
+            "description": "Amount due for this payment"  
+          },  
+          "paid": {  
+            "type": "boolean",  
+            "method": "generate",  
+            "description": "Whether this payment has been paid"  
+          }  
+        }  
+      },  
+      "description": "Schedule of rent payments"  
+    }  
+  }  
+}  

@@ -1,0 +1,24 @@
+{  
+  "fields": {  
+    "tenant_name": {  
+      "type": "string",  
+      "method": "extract",  
+      "description": "Tenant's full name"  
+    },  
+    "monthly_rent": {  
+      "type": "number",  
+      "method": "extract",  
+      "description": "Monthly rent amount"  
+    },  
+    "lease_start_date": {  
+      "type": "string",  
+      "method": "extract",  
+      "description": "This is the date when the lease starts in the format YYYY-MM-DD"  
+    },  
+    "lease_end_date": {  
+      "type": "string",  
+      "method": "extract",  
+      "description": "This is the date when the lease ends in the format YYYY-MM-DD"  
+    }  
+  }  
+}  

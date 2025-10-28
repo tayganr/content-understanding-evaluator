@@ -1,0 +1,44 @@
+{  
+  "tenant_name": "John Alexander Smith",  
+  "monthly_rent": 2250,  
+  "lease_start_date": "2024-09-01",  
+  "lease_end_date": "2025-08-31",  
+  "is_furnished": true,  
+  "number_of_occupants": 2,  
+  "move_in_time": "14:00",  
+  "property_type": "Apartment",  
+  "tenant_contacts": [  
+    {  
+      "contact_name": "Claire Smith",  
+      "relation": "Mother",  
+      "phone": "+44 7911 654321"  
+    },  
+    {  
+      "contact_name": "David Lee",  
+      "relation": "Employer",  
+      "phone": "+44 20 7123 4567"  
+    }  
+  ],  
+  "payment_schedule": [  
+    {  
+      "due_date": "2024-09-01",  
+      "amount_due": 2250,  
+      "paid": true  
+    },  
+    {  
+      "due_date": "2024-10-01",  
+      "amount_due": 2250,  
+      "paid": true  
+    },  
+    {  
+      "due_date": "2024-11-01",  
+      "amount_due": 2250,  
+      "paid": false  
+    },  
+    {  
+      "due_date": "2024-12-01",  
+      "amount_due": 2250,  
+      "paid": false  
+    }  
+  ]  
+}  

@@ -1,0 +1,39 @@
+{  
+  "tenant_name": "Michael Aaron Lee",  
+  "monthly_rent": 3100,  
+  "lease_start_date": "2024-10-15",  
+  "lease_end_date": "2025-10-14",  
+  "is_furnished": true,  
+  "number_of_occupants": 3,  
+  "move_in_time": "10:30",  
+  "property_type": "Condo",  
+  "tenant_contacts": [  
+    {  
+      "contact_name": "Rachel Lee",  
+      "relation": "Sister",  
+      "phone": "+1 (617) 333-8721"  
+    },  
+    {  
+      "contact_name": "Kevin Brown",  
+      "relation": "Employer",  
+      "phone": "+1 (617) 555-4402"  
+    }  
+  ],  
+  "payment_schedule": [  
+    {  
+      "due_date": "2024-10-15",  
+      "amount_due": 3100,  
+      "paid": true  
+    },  
+    {  
+      "due_date": "2024-11-15",  
+      "amount_due": 3100,  
+      "paid": true  
+    },  
+    {  
+      "due_date": "2024-12-15",  
+      "amount_due": 3100,  
+      "paid": false  
+    }  
+  ]  
+}  
