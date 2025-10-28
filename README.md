@@ -33,7 +33,7 @@ You can use it to:
 - 🌐 **Interactive viewer**    
   Use `evaluation_viewer.html` to explore historical runs, visualize accuracy trends, compare Standard vs. Pro mode, and analyze cost efficiency.  
 
-  ## 🚀 Quickstart  
+## 🚀 Quickstart  
   
 1. **Clone the repository**  
    ```bash  
