@@ -32,6 +32,45 @@ You can use it to:
   
 - 🌐 **Interactive viewer**    
   Use `evaluation_viewer.html` to explore historical runs, visualize accuracy trends, compare Standard vs. Pro mode, and analyze cost efficiency.  
+
+  ## 🚀 Quickstart  
+  
+1. **Clone the repository**  
+   ```bash  
+   git clone https://github.com/tayganr/content-understanding-evaluator.git  
+   ```  
+  
+2. **Open the folder in VS Code**  
+   ```  
+   content-understanding-evaluator  
+   ```  
+  
+3. **Create a Python virtual environment**  
+   ```bash  
+   python -m venv .venv  
+   ```  
+  
+4. **Activate the virtual environment**  
+   ```bash  
+   .\.venv\Scripts\activate  
+   ```  
+  
+5. **Install dependencies**  
+   ```bash  
+   pip install -r requirements.txt  
+   ```  
+  
+6. **Update the `.env` file**    
+   Add your **Azure Content Understanding API endpoint** and **key**.  
+  
+7. **Run the evaluator**  
+   ```bash  
+   python .\document_analyzer_evaluator.py  
+   ```  
+  
+✅ **First run:**    
+An `output` folder will be created containing results for the sample documents.    
+You can visualize the extracted data by opening the **HTML viewer**.  
   
  ## 🧩 Project Structure  
   
