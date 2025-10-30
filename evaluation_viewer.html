@@ -129,6 +129,24 @@
         .change-neutral {
             color: #6c757d !important;
         }
+        .field-results-summary {
+            font-style: italic;
+            border-top: 1px solid #dee2e6;
+            padding-top: 0.5rem;
+        }
+        .filter-controls {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .field-row {
+            transition: opacity 0.2s ease;
+        }
+        .field-row[style*="display: none"] {
+            opacity: 0;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -1151,9 +1169,26 @@
                 detailsHtml += `
                     <div class="row mt-4">
                         <div class="col-12">
-                            <h6>Field-Level Results</h6>
-                            ${run.results.document_level.map(doc => `
-                                <div class="mb-3">
+                            <h6 class="mb-3">Field-Level Results</h6>
+                            <div class="filter-controls">
+                                <div class="d-flex gap-2 align-items-center flex-wrap">
+                                    <label class="form-label mb-0 me-2">Filter by:</label>
+                                    <input type="text" class="form-control form-control-sm" id="fieldFilter" 
+                                           placeholder="Field name..." style="width: 180px;"
+                                           onkeyup="filterFieldResults()">
+                                    <select class="form-select form-select-sm" id="statusFilter" 
+                                            onchange="filterFieldResults()" style="width: 130px;">
+                                        <option value="">All Status</option>
+                                        <option value="✅">✅ Pass</option>
+                                        <option value="❌">❌ Fail</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary btn-sm" onclick="clearFieldFilters()">
+                                        <i class="fas fa-times"></i> Clear
+                                    </button>
+                                </div>
+                            </div>
+                            ${run.results.document_level.map((doc, docIndex) => `
+                                <div class="mb-3 document-section" data-doc-index="${docIndex}">
                                     <h6 class="text-secondary">${doc.doc}</h6>
                                     <div class="table-responsive">
                                         <table class="table table-sm field-detail-row">
@@ -1183,14 +1218,18 @@
                                                     }
                                                     
                                                     return `
-                                                        <tr class="${details.status === '✅' ? 'table-success' : 'table-danger'}">
+                                                        <tr class="field-row ${details.status === '✅' ? 'table-success' : 'table-danger'}" 
+                                                            data-field="${field.toLowerCase()}" 
+                                                            data-status="${details.status}">
                                                             <td><code>${field}</code></td>
                                                             <td>${expectedDisplay}</td>
                                                             <td>${actualDisplay}</td>
                                                             <td class="status-icon">${details.status}</td>
                                                         </tr>
                                                         ${isComplex ? `
-                                                            <tr id="${fieldId}" style="display: none;">
+                                                            <tr class="field-row complex-row" id="${fieldId}" style="display: none;" 
+                                                                data-field="${field.toLowerCase()}" 
+                                                                data-status="${details.status}">
                                                                 <td colspan="4">
                                                                     ${generateComplexFieldComparison(details.expected, details.actual, field)}
                                                                 </td>
@@ -1200,6 +1239,9 @@
                                                 }).join('')}
                                             </tbody>
                                         </table>
+                                    </div>
+                                    <div class="field-results-summary text-muted small mt-2" style="display: none;">
+                                        <span class="visible-count">0</span> of <span class="total-count">0</span> fields shown
                                     </div>
                                 </div>
                             `).join('')}
@@ -1641,6 +1683,126 @@
                         toggle.innerHTML = '📋 Complex Data (click to expand)';
                     });
                 }
+            }
+        }
+
+        function filterFieldResults() {
+            const fieldFilter = document.getElementById('fieldFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            
+            if (!fieldFilter || !statusFilter) return;
+            
+            const fieldText = fieldFilter.value.toLowerCase().trim();
+            const statusValue = statusFilter.value;
+            
+            // Get all field rows
+            const fieldRows = document.querySelectorAll('.field-row');
+            const documentSections = document.querySelectorAll('.document-section');
+            
+            let totalVisible = 0;
+            let totalRows = 0;
+            
+            documentSections.forEach(section => {
+                const sectionRows = section.querySelectorAll('.field-row:not(.complex-row)');
+                let sectionVisible = 0;
+                
+                sectionRows.forEach(row => {
+                    totalRows++;
+                    const fieldName = row.getAttribute('data-field');
+                    const status = row.getAttribute('data-status');
+                    
+                    // Check if row matches filters
+                    const matchesField = !fieldText || fieldName.includes(fieldText);
+                    const matchesStatus = !statusValue || status === statusValue;
+                    
+                    if (matchesField && matchesStatus) {
+                        row.style.display = '';
+                        // Also show corresponding complex row if it exists and was previously visible
+                        const complexRow = row.nextElementSibling;
+                        if (complexRow && complexRow.classList.contains('complex-row')) {
+                            // Only show if it was previously expanded (not hidden by user)
+                            const wasExpanded = complexRow.querySelector('.complex-field-content') && 
+                                             !complexRow.style.display.includes('none');
+                            if (wasExpanded) {
+                                complexRow.style.display = 'table-row';
+                            } else {
+                                complexRow.style.display = 'none';
+                            }
+                        }
+                        sectionVisible++;
+                        totalVisible++;
+                    } else {
+                        row.style.display = 'none';
+                        // Hide corresponding complex row if it exists
+                        const complexRow = row.nextElementSibling;
+                        if (complexRow && complexRow.classList.contains('complex-row')) {
+                            complexRow.style.display = 'none';
+                        }
+                    }
+                });
+                
+                // Update section summary
+                const summary = section.querySelector('.field-results-summary');
+                const visibleCount = summary.querySelector('.visible-count');
+                const totalCount = summary.querySelector('.total-count');
+                
+                if (summary && visibleCount && totalCount) {
+                    visibleCount.textContent = sectionVisible;
+                    totalCount.textContent = sectionRows.length;
+                    
+                    // Show summary if filtering is active
+                    if (fieldText || statusValue) {
+                        summary.style.display = 'block';
+                    } else {
+                        summary.style.display = 'none';
+                    }
+                }
+            });
+            
+            // Show message if no results
+            updateNoResultsMessage(totalVisible === 0 && (fieldText || statusValue));
+        }
+
+        function clearFieldFilters() {
+            const fieldFilter = document.getElementById('fieldFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            
+            if (fieldFilter) fieldFilter.value = '';
+            if (statusFilter) statusFilter.value = '';
+            
+            // Show all rows
+            const fieldRows = document.querySelectorAll('.field-row');
+            fieldRows.forEach(row => {
+                row.style.display = '';
+            });
+            
+            // Hide all summaries
+            const summaries = document.querySelectorAll('.field-results-summary');
+            summaries.forEach(summary => {
+                summary.style.display = 'none';
+            });
+            
+            // Remove no results message
+            updateNoResultsMessage(false);
+        }
+
+        function updateNoResultsMessage(show) {
+            let messageElement = document.getElementById('noFieldResults');
+            
+            if (show && !messageElement) {
+                // Create message
+                const modalBody = document.getElementById('runDetailModalBody');
+                const fieldSection = modalBody.querySelector('.row.mt-4');
+                if (fieldSection) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.id = 'noFieldResults';
+                    messageDiv.className = 'alert alert-info mt-3';
+                    messageDiv.innerHTML = '<strong>No fields match the current filters.</strong> Try adjusting your search criteria.';
+                    fieldSection.appendChild(messageDiv);
+                }
+            } else if (!show && messageElement) {
+                // Remove message
+                messageElement.remove();
             }
         }
     </script>
